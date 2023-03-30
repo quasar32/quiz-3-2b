@@ -23,7 +23,10 @@ condition_variable checkout_ready;
 */
 void books_checkout(int quantity)
 {
-
+	unique_lock lk(mut);
+	checkout_ready.wait(lk, [=]() {return books_available >= quantity; });
+	books_available -= quantity;
+	lk.unlock();
 }
 
 /* TODO:
@@ -34,7 +37,10 @@ void books_checkout(int quantity)
  */
 void books_checkin(int quantity)
 {
-
+	unique_lock lk(mut);
+	books_available += quantity;
+	lk.unlock();
+	checkout_ready.notify_all();
 }
 
 /**
@@ -45,25 +51,29 @@ void books_checkin(int quantity)
  */
 void manager(int threadId, int quantity)
 {
-    books_checkout(quantity);
-    cout << "Student " << threadId << " checked out " << quantity << " books.\n";
-    sleep(2); // keep the books for some time
-    books_checkin(quantity);
-    cout << "Student " << threadId << " checked in " << quantity << " books.\n";
+	books_checkout(quantity);
+	cout << "Student " << threadId << " checked out " << quantity << " books.\n";
+	sleep(2); // keep the books for some time
+	books_checkin(quantity);
+	cout << "Student " << threadId << " checked in " << quantity << " books.\n";
 }
 
 int main()
 {
-    // The number of books to checkout by each thread
-    int cart[6] = {90, 90, 40, 50, 30, 5};
+	// The number of books to checkout by each thread
+	int cart[6] = {90, 90, 40, 50, 30, 5};
 
-    // Creating an array of threads
-    thread *student_threads = new thread[6];
+	// Creating an array of threads
+	thread *student_threads = new thread[6];
 
-    /*TODO: Create the six student threads that will use the function (manager) for a respective number of books (cart[i])*/
+	for (int i = 0; i < 6; i++) {
+		student_threads[i] = thread(manager, i, cart[i]); 
+	}
 
-    /*TODO: Wait for all the six threads*/
+	for (int i = 0; i < 6; i++) {
+		student_threads[i].join();
+	}
 
-    delete[] student_threads;
-    return 0;
+	delete[] student_threads;
+	return 0;
 }
